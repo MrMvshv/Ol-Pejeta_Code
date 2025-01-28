@@ -14,8 +14,12 @@ import math
 import param as PARAM
 from dataTypes import geoLoc, geoCircle
 
+
+
+
+
 class Drone:
-    def __init__(self, sysID, IP, portNumber, takeoff = False):
+    def __init__(self, sysID, IP, portNumber, takeoff = True):
         self.sysID = sysID
         self.IP = IP
         self.portNumber = portNumber
@@ -147,13 +151,13 @@ class LawnmowerSearch:
         self.drone = drone
 
     def search(self):
-        pNW = geoLoc(PARAM.limit_north, PARAM.limit_west)
-        pNE = geoLoc(PARAM.limit_north, PARAM.limit_east)
-        pSW = geoLoc(PARAM.limit_south, PARAM.limit_west)
+        pNW = geoLoc(PARAM.limit_north_lawn, PARAM.limit_west_lawn)
+        pNE = geoLoc(PARAM.limit_north_lawn, PARAM.limit_east_lawn)
+        pSW = geoLoc(PARAM.limit_south_lawn, PARAM.limit_west_lawn)
 
         # @@@ TASK 5 @@@: Explain what the next 4 lines do.
-        latStepNbr = int(pNW.distTo(pNE) // (PARAM.foundThreshold / 2**0.5) + 1)
-        lonStepNbr = int(pNW.distTo(pSW) // (PARAM.foundThreshold / 2**0.5) + 1)
+        latStepNbr = int(pNW.distTo(pNE) // (PARAM.foundThresholdLawn / 2**0.5) + 1)
+        lonStepNbr = int(pNW.distTo(pSW) // (PARAM.foundThresholdLawn / 2**0.5) + 1)
         lat_points = np.linspace(PARAM.limit_south, PARAM.limit_north, latStepNbr).tolist()
         lon_points = np.linspace(PARAM.limit_west, PARAM.limit_east, lonStepNbr).tolist()
 
@@ -162,93 +166,26 @@ class LawnmowerSearch:
         grid_points = grid_points[start_index:] + grid_points[:start_index]
         for point in grid_points:
             self.drone.gotoWP(point)
-            self.sense()
-    
-    def sense(self):
-        result =  requests.post(PARAM.URL_SENSE(self.drone.IP), json={"drone_id": self.drone.sysID}).json()["sense_status"]
-        pos = self.drone.get_position()
-        if result["state"] == "found":
-            self.drone.printInfo(f"Rhino found at {pos}")
+            print(f"Drone {self.drone.sysID} reached point {point}")    
+        print("Lawnmower search complete")
+        print("Going home")
+        self.drone.gotoWP(geoLoc(PARAM.home_lat, PARAM.home_long, PARAM.takeOffAltitude))
 
-
-class TriangulationSearch:
-    def __init__(self, drone : Drone):
-        self.drone = drone
-
-    def search(self):
-        pNW = geoLoc(PARAM.limit_north, PARAM.limit_west)
-        pNE = geoLoc(PARAM.limit_north, PARAM.limit_east)
-        pSW = geoLoc(PARAM.limit_south, PARAM.limit_west)
-
-        latStepNbr = int(pNW.distTo(pNE) // (PARAM.sensorRange / 2**0.5) + 1)
-        lonStepNbr = int(pNW.distTo(pSW) // (PARAM.sensorRange / 2**0.5) + 1)
-
-        lat_points = np.linspace(PARAM.limit_south, PARAM.limit_north, latStepNbr).tolist()
-        lon_points = np.linspace(PARAM.limit_west, PARAM.limit_east, lonStepNbr).tolist()
-        grid_points = [geoLoc(lat, lon, PARAM.takeOffAltitude) for lat in lat_points for lon in (lon_points if lat_points.index(lat) % 2 == 0 else lon_points[::-1])]
-        start_index = np.random.randint(len(grid_points))
-        grid_points = grid_points[start_index:] + grid_points[:start_index]
-        for point in grid_points:
-            self.drone.gotoWP(point)
-            self.sense()
-    
-    def sense(self):
-        # @@@ TASK 7 @@@: Try understanding what this function and the proximitySearch() function do?
-        result =  requests.post(PARAM.URL_SENSE(drone.IP), json={"drone_id": self.drone.sysID}).json()["sense_status"]
-        pos = self.drone.get_position()
-        if result["state"] == "found":
-            self.drone.printInfo(f"Rhino found at {pos}")
-            self.sense() # Sense again to check if multiple rhinos are in range 
-        elif result["state"] == "out_of_range":
-            pass
-        else:
-            self.drone.printInfo(f"Rhino in range at {pos}")
-            self.proximitySearch(geoCircle(pos, result["distance"]))
-
-    def proximitySearch(self, circle : geoCircle):
-        offset = PARAM.foundThreshold
-        p = []
-        p.append(circle.center.offset(-offset, offset))
-        p.append(circle.center.offset(offset, offset))
-        p.append(circle.center.offset(offset, -offset))
-        p.append(circle.center.offset(-offset, -offset))
-
-        circles = []
-        for point in p:
-            self.drone.gotoWP(point)
-            rep = requests.post(PARAM.URL_SENSE(drone.IP), json={"drone_id": self.drone.sysID}).json()["sense_status"]
-            if rep["state"] == "found":
-                self.drone.printInfo(f"Rhino found at {point}")
-                self.sense()
-                return
-            elif rep["state"] == "in_range":
-                circles.append(geoCircle(point, rep["distance"]))
-            else:
-                pass
-        
-        if len(circles) >= 2:
-            intersection = circle.intersection3circle(circles[0], circles[1])
-            self.drone.gotoWP(intersection)
-            self.sense()
-        elif len(circles) == 1:
-            self.drone.gotoWP(circles[0].center)
-            self.proximitySearch(circles[0])
-        else:
-            raise ValueError(f"Unexpected number of circles: {len(circles)}")
 
 class SpiralSearch:
     def __init__(self, drone: Drone):
         self.drone = drone
 
     def search(self):
-        print("search commenced")
-        center = geoLoc(PARAM.limit_south + (PARAM.limit_north-PARAM.limit_south)/2 , PARAM.limit_west + (PARAM.limit_east - PARAM.limit_west)/2, PARAM.takeOffAltitude) # Start at the center
+        print("Spiral commenced")
+        #center = geoLoc(PARAM.limit_south + (PARAM.limit_north-PARAM.limit_south)/2 , PARAM.limit_west + (PARAM.limit_east - PARAM.limit_west)/2, PARAM.takeOffAltitude) # Start at the center
+        center = geoLoc(PARAM.spiral_lat , PARAM.spiral_long, PARAM.takeOffAltitude)
         step_size = PARAM.foundThreshold  # Adjust step size as needed
-        angle_step = 15  # Adjust angle step for smoother spiral
+        angle_step = 75  # Adjust angle step for smoother spiral
 
-        
         radius = 0
         angle = 0
+
         while True:  # We will add a break condition based on the bounds of the area
              #convert angle to radians
             angle_radians = math.radians(angle)
@@ -258,16 +195,16 @@ class SpiralSearch:
 
             #offset from center
             new_location = center.offset(east=x_offset,north=y_offset)
-            print("going to the center of the geolock zone")
+            print(f"New spiral radius: {radius} and angle: {angle}")
             self.drone.gotoWP(new_location)
-            print("sensing")
             radius += step_size
             angle += angle_step
 
+            print(f"compare to params? : {new_location.lat}, {new_location.lon}")
             if (new_location.lat > PARAM.limit_north or new_location.lat < PARAM.limit_south or new_location.lon > PARAM.limit_east or new_location.lon < PARAM.limit_west):
-                print("search complete")
+                print("spiral search complete. Out of bounds")
                 break
-
+                
 
 
 if __name__ == "__main__":
@@ -295,14 +232,10 @@ if __name__ == "__main__":
     TASK_NUMBER = 9
 
     if TASK_NUMBER == 4:
-        searchManager = ManualSearch(drone)
-    elif TASK_NUMBER == 6: 
-        searchManager = LawnmowerSearch(drone)
-    elif TASK_NUMBER == 8:
-        searchManager = TriangulationSearch(drone)
+        ManualSearch(drone)
     elif TASK_NUMBER == 9:
-        searchManager = SpiralSearch(drone)
+        print("task 9")
+        SpiralSearch(drone).search()
+        LawnmowerSearch(drone).search()
     else:
         raise ValueError(f"Unkown TASK_NUMBER: {TASK_NUMBER}")
-
-    searchManager.search()
