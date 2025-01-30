@@ -15,9 +15,6 @@ import param as PARAM
 from dataTypes import geoLoc, geoCircle
 
 
-
-
-
 class Drone:
     def __init__(self, sysID, IP, portNumber, takeoff = True):
         self.sysID = sysID
@@ -27,7 +24,6 @@ class Drone:
 
         self.name = f"Drone{sysID}"
         self.spinner = itertools.cycle(['-', '/', '|', '\\'])
-        self.rhinosFound = 0
         self.isLastWait = False
 
         self.printInfo(f"Connecting to {IP}:{portNumber}")
@@ -42,10 +38,11 @@ class Drone:
                 self.printInfo(" Waiting for vehicle to initialise...", wait=True)
                 time.sleep(1)
             
-            self.arm()
-            self.take_off(PARAM.takeOffAltitude)
-            self.printInfo(f"Drone {self.sysID} ready to search")
+            #self.arm()
+            #self.take_off(PARAM.takeOffAltitude)
+            self.printInfo(f"Drone {self.sysID} has taken off ready to search")
         self.printInfo(f"Drone {self.sysID} skipped takeoff and is ready to search")
+
     def printInfo(self, msg, wait=False):
         if wait:
             if not self.isLastWait:
@@ -90,18 +87,15 @@ class Drone:
         self.vehicle.simple_goto(point)
 
     def is_waypoint_reached(self, waypoint : geoLoc, threshold=10):
-        # @@@ TASK 1 @@@: Check if the drone reached the drone has reached the waypoint.
         # This function should return True if the drone is closer than the threshold to the waypoint
         pos = self.get_position() # The get_position() function request the position of the drone.
         dist = pos.distTo(waypoint) # The distTo() function computes the distance in meters between the drone and the waypoint
-        # @@@ 1 LINE IS MISSING HERE @@@ 
-        return dist < threshold # REMOVE
+
+        return dist < threshold
     
     def gotoWP(self, waypoint : geoLoc):
-        # @@@ TASK 2 @@@: Write a function that sends the drones to a waypoint and then waits until it reaches it.
-        self.send_to_waypoint(waypoint) # The send_to_waypoint() function sends the drone towards a waypoint.
-        # @@@ 2 LINE IS MISSING HERE @@@: write a while loop that checks every second if the waypoint is reached (use the time.sleep() function)
-        while not self.is_waypoint_reached(waypoint): # REMOVE
+        self.send_to_waypoint(waypoint) # The send_to_waypoint() function sends the drone towards a waypoint
+        while not self.is_waypoint_reached(waypoint):
             time.sleep(1)
 
         self.printInfo(f"Waypoint reached {waypoint}")
@@ -117,11 +111,6 @@ class ManualSearch:
             key = input()
             if key == "q":
                 break
-            elif key == "e":
-                print(f"@@@@ Sensing with drone {self.drone.sysID}")
-                 # Sense
-                response = requests.post(PARAM.URL_SENSE(drone.IP), json={"drone_id": self.drone.sysID}).json()["sense_status"]
-                print(f"\t\t{response}")
             elif key == "a":
                 print(f"@@@@ Moving drone {self.drone.sysID} west {step}m")
                 pos = self.drone.get_position()
@@ -164,10 +153,13 @@ class LawnmowerSearch:
         grid_points = [geoLoc(lat, lon, PARAM.takeOffAltitude) for lat in lat_points for lon in (lon_points if lat_points.index(lat) % 2 == 0 else lon_points[::-1])]
         start_index = np.random.randint(len(grid_points))
         grid_points = grid_points[start_index:] + grid_points[:start_index]
+
         for point in grid_points:
             self.drone.gotoWP(point)
-            print(f"Drone {self.drone.sysID} reached point {point}")    
+            print(f"Drone {self.drone.sysID} reached point {point}")
+
         print("Lawnmower search complete")
+
         print("Going home")
         self.drone.gotoWP(geoLoc(PARAM.home_lat, PARAM.home_long, PARAM.takeOffAltitude))
 
@@ -208,27 +200,15 @@ class SpiralSearch:
 
 
 if __name__ == "__main__":
-    # @@@ TASK 3 @@@: Fill in the network details for your own group.
-    # Add system ID, i.e. the drone number assigned to your group.
+    # Add system ID
     SYS_ID = 1
-    # Add the drone IP address (same for all groups) as a string.
+    # Add the drone IP address
     IP = "127.0.0.1"
-    # Add port number (specific to your groupe).
+    # Add port number
     PORT_NUMBER = 14550
     
     drone = Drone(SYS_ID, IP, PORT_NUMBER) # Connect to the simulated drone.
 
-    # @@@ TASK 4 @@@: Change the task number (TASK_NUMBER) to 4 and run this script to test TASK 1, 2 and 3.
-    # This will run the manual search algorithm
-
-    # @@@ TASK 6 @@@: Change the task number (TASK_NUMBER) to 6 and run this script to test TASK 5.
-    # This will run the lawnmower search algorithm
-
-    # @@@ TASK 8 @@@: Change the task number (TASK_NUMBER) to 8 and run this script to test TASK 7.
-    # This will run the triangulation search algorithm
-    
-    # @@@ TASK 9 @@@: Change the task number (TASK_NUMBER) to 9 and run this script to test the spiral search algorithm
-    
     TASK_NUMBER = 9
 
     if TASK_NUMBER == 4:
